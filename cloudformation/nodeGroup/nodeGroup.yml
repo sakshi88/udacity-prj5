@@ -1,0 +1,84 @@
+Description: Creates nodeGroup
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Default: capstone
+    Type: String
+
+  MinSize:
+    Description: Min number of servers
+    Default: 2
+    Type: String
+
+  MaxSize:
+    Description: Max number of servers
+    Default: 4
+    Type: String
+
+  DesiredSize:
+    Description: Desired size of servers
+    Default: 2
+    Type: Number
+
+  KeyPairName:
+    Description: The EC2 Key Pair to allow SSH access to servers
+    Default: udacity
+    Type: AWS::EC2::KeyPair::KeyName
+
+Mappings:
+  ServicePrincipals:
+    aws-cn:
+      ec2: ec2.amazonaws.com.cn
+    aws-us-gov:
+      ec2: ec2.amazonaws.com
+    aws:
+      ec2: ec2.amazonaws.com
+
+Resources:
+  NodeGroupInstanceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-nodegroup-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !FindInMap [ServicePrincipals, !Ref "AWS::Partition", ec2]
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      Path: /
+
+
+  NodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Sub ${EnvironmentName}-cluster
+      NodeRole: !GetAtt NodeGroupInstanceRole.Arn
+      NodegroupName: !Sub ${EnvironmentName}-nodegroup
+      ScalingConfig:
+        MinSize: !Ref MinSize
+        MaxSize: !Ref MaxSize
+        DesiredSize: !Ref DesiredSize
+      Subnets:
+        Fn::Split:
+          - ","
+          - Fn::ImportValue:
+              Fn::Sub: ${EnvironmentName}-PUB-NETS
+
+Outputs:
+  NodeGroupInstanceRole:
+    Description: Node Group Instance role
+    Value: !GetAtt NodeGroupInstanceRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-NodeGroupInstanceRole
+  NodeGroup:
+    Description: Node Group
+    Value: !Ref NodeGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-NodeGroup

@@ -1,0 +1,6 @@
+[
+    "EnvironmentName=capstone",
+    "VPCCidrRange=192.168.0.0/16",
+    "PublicSubnet1CIDRRange=192.168.0.0/18",
+    "PublicSubnet2CIDRRange=192.168.64.0/18"
+]

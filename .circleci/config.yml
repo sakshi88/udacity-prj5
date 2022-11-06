@@ -50,6 +50,44 @@ jobs:
             docker push $DOCKERHUB_USERNAME/$DOCKER_IMAGE_NAME:$CIRCLE_WORKFLOW_ID
             echo "Uploaded successfully!!!"
 
+  create-infrastructure:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Install necessary dependencies
+          command: yum install -y tar gzip
+      - run:
+          name: Create VPC and subnets
+          command: aws cloudformation deploy --template-file cloudformation/vpc/vpc.yml --tags project=${ENVIRONMENT_NAME} --stack-name "${ENVIRONMENT_NAME}-eks-vpc" --region ${AWS_DEFAULT_REGION} --parameter-overrides file://cloudformation/vpc/vpc-parameters.json
+      - run:
+          name: Create Cluster
+          command: aws cloudformation deploy --template-file cloudformation/cluster/eksCluster.yml --tags project=${ENVIRONMENT_NAME} --stack-name "${ENVIRONMENT_NAME}-eks-cluster" --region ${AWS_DEFAULT_REGION} --parameter-overrides file://cloudformation/cluster/eksCluster-parameters.json --capabilities CAPABILITY_NAMED_IAM
+          no_output_timeout: 15m
+      - run:
+          name: Create nodeGroup
+          command: |
+            aws cloudformation deploy --template-file cloudformation/nodeGroup/nodeGroup.yml --tags project=${ENVIRONMENT_NAME} --stack-name "${ENVIRONMENT_NAME}-eks-nodeGroup" --region ${AWS_DEFAULT_REGION} --parameter-overrides file://cloudformation/nodeGroup/nodeGroup-parameters.json --capabilities CAPABILITY_NAMED_IAM
+      - run:
+          name: Create management node
+          command: |
+            aws cloudformation deploy --template-file cloudformation/managementNode/managementNode.yml --tags project=${ENVIRONMENT_NAME} --stack-name "${ENVIRONMENT_NAME}-eks-managementNode" --region ${AWS_DEFAULT_REGION} --parameter-overrides file://cloudformation/managementNode/managementNode-parameters.json --output text >> ~/deploymentStatus.txt
+            echo "Contents of deploymentStatus.txt"
+            cat ~/deploymentStatus.txt
+      - run:
+          name: Extract IPs of management nodes
+          command: |
+            echo [management] > ~/inventory.txt
+            aws ec2 describe-instances --region "${AWS_DEFAULT_REGION}" --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:Name,Values=${ENVIRONMENT_NAME}-management*" --output text >> ~/inventory.txt
+            echo "Contents of inventory.txt"
+            cat ~/inventory.txt
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - inventory.txt
+            - deploymentStatus.txt
+
 workflows:
   default:
     jobs:
@@ -57,3 +95,4 @@ workflows:
     - build-upload-docker:
           requires:
             - lint-build
+    - create-infrastructure  
