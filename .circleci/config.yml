@@ -88,6 +88,105 @@ jobs:
             - inventory.txt
             - deploymentStatus.txt
 
+  configure-infrastructure:
+    docker:
+      - image: python:3.7-alpine3.11
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - "21:81:58:de:3e:43:35:6f:73:26:d3:25:aa:87:b1:8c"
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install application dependencies
+          command: |
+            apk add --update ansible
+      - run:
+          name: Configure app server
+          command: |
+            if grep -q "No changes to deploy" ~/deploymentStatus.txt
+              then
+                cat ~/inventory.txt
+                echo "app server configured already"
+              else
+                cat ~/inventory.txt
+                cd ansible
+                ansible-playbook -i ~/inventory.txt configureServer.yml
+              fi
+  
+  configure-cluster:
+    docker:
+      - image: python:3.7-alpine3.11
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - "21:81:58:de:3e:43:35:6f:73:26:d3:25:aa:87:b1:8c"
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install application dependencies
+          command: |
+            apk add --update ansible
+      - run:
+          name: Configure cluster node
+          command: |
+            if grep -q "No changes to deploy" ~/deploymentStatus.txt
+              then
+                cat ~/inventory.txt
+                echo "Our cluster node is already configured."
+              else
+                cat ~/inventory.txt
+                cd ansible
+                ansible-playbook -i ~/inventory.txt configure-cluster.yml
+              fi
+      - run:
+          name: Wait for LoadBalancer's to become reachable
+          command: |
+            if grep -q "No changes to deploy" ~/deploymentStatus.txt
+              then
+                cat ~/inventory.txt
+                echo "Our cluster node is already configured."
+              else
+                cat ~/inventory.txt
+                echo "Wait for 60 seconds..."
+                sleep 60
+              fi
+      - run:
+          name: Save LoadBalancer's DNS name
+          command: |
+            cat ~/inventory.txt
+            cd ansible
+            ansible-playbook -i ~/inventory.txt save-elb-dns.yml
+            cat ~/elb_dns.txt
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - elb_dns.txt
+  
+  deploy-docker:
+    docker:
+      - image: python:3.7-alpine3.11
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - "21:81:58:de:3e:43:35:6f:73:26:d3:25:aa:87:b1:8c"
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install application dependencies
+          command: |
+            apk add --update ansible
+      - run:
+          name: Deploy Docker Image
+          command: |
+            cat ~/inventory.txt
+            cd ansible
+            ansible-playbook -i ~/inventory.txt deploy-appImage.yml
+          no_output_timeout: 2m
+
 workflows:
   default:
     jobs:
@@ -95,4 +194,16 @@ workflows:
     - build-upload-docker:
           requires:
             - lint-build
-    - create-infrastructure  
+    - create-infrastructure:
+          requires:
+            - build-upload-docker 
+    - configure-infrastructure:
+          requires:
+            - create-infrastructure
+    - configure-cluster:
+          requires:
+            - configure-infrastructure
+            - build-upload-docker
+    - deploy-docker:
+          requires:
+            - configure-cluster

@@ -1,0 +1,9 @@
+- name: Copy deployment config
+  copy:
+    src: "{{ ENVIRONMENT_NAME }}-deployment.yaml"
+    dest: $HOME
+
+- name: Apply deployment config
+  shell: "./bin/kubectl apply -f {{ ENVIRONMENT_NAME }}-deployment.yaml"
+  args:
+    chdir: $HOME
