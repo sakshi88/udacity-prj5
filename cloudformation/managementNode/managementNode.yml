@@ -11,7 +11,7 @@ Parameters:
     Type: String
   AmiImageId:
     Description: AMI Id
-    Default: ami-09d3b3274b6c5d4aa
+    Default: ami-08c40ec9ead489470
     Type: String
 
 Resources:

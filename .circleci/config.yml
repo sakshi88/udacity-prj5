@@ -70,7 +70,7 @@ jobs:
           command: |
             aws cloudformation deploy --template-file cloudformation/nodeGroup/nodeGroup.yml --tags project=${ENVIRONMENT_NAME} --stack-name "${ENVIRONMENT_NAME}-eks-nodeGroup" --region ${AWS_DEFAULT_REGION} --parameter-overrides file://cloudformation/nodeGroup/nodeGroup-parameters.json --capabilities CAPABILITY_NAMED_IAM
       - run:
-          name: Create management node
+          name: Create management nodes
           command: |
             aws cloudformation deploy --template-file cloudformation/managementNode/managementNode.yml --tags project=${ENVIRONMENT_NAME} --stack-name "${ENVIRONMENT_NAME}-eks-managementNode" --region ${AWS_DEFAULT_REGION} --parameter-overrides file://cloudformation/managementNode/managementNode-parameters.json --output text >> ~/deploymentStatus.txt
             echo "Contents of deploymentStatus.txt"
@@ -95,7 +95,7 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints:
-            - "21:81:58:de:3e:43:35:6f:73:26:d3:25:aa:87:b1:8c"
+            - "bb:d2:5e:32:22:1a:c6:05:bb:bf:eb:bd:ca:d4:3d:7d"
       - attach_workspace:
           at: ~/
       - run:
@@ -110,6 +110,7 @@ jobs:
                 cat ~/inventory.txt
                 echo "app server configured already"
               else
+                echo "Contents of inventory.txt are"
                 cat ~/inventory.txt
                 cd ansible
                 ansible-playbook -i ~/inventory.txt configureServer.yml
@@ -122,7 +123,7 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints:
-            - "21:81:58:de:3e:43:35:6f:73:26:d3:25:aa:87:b1:8c"
+            - "21:81:58:de:3e:43:350:6f:73:26:d3:25:aa:87:b1:8c"
       - attach_workspace:
           at: ~/
       - run:
@@ -137,6 +138,7 @@ jobs:
                 cat ~/inventory.txt
                 echo "Our cluster node is already configured."
               else
+                echo "Contents of inventory.txt are"
                 cat ~/inventory.txt
                 cd ansible
                 ansible-playbook -i ~/inventory.txt configure-cluster.yml
@@ -149,6 +151,7 @@ jobs:
                 cat ~/inventory.txt
                 echo "Our cluster node is already configured."
               else
+                echo "Contents of inventory.txt are"
                 cat ~/inventory.txt
                 echo "Wait for 60 seconds..."
                 sleep 60
@@ -156,9 +159,11 @@ jobs:
       - run:
           name: Save LoadBalancer's DNS name
           command: |
+            echo "Contents of inventory.txt are"
             cat ~/inventory.txt
             cd ansible
             ansible-playbook -i ~/inventory.txt save-elb-dns.yml
+            echo "Contents of elb_dns.txt are"
             cat ~/elb_dns.txt
       - persist_to_workspace:
           root: ~/
@@ -172,7 +177,7 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints:
-            - "21:81:58:de:3e:43:35:6f:73:26:d3:25:aa:87:b1:8c"
+            - "bb:d2:5e:32:22:1a:c6:05:bb:bf:eb:bd:ca:d4:3d:7d"
       - attach_workspace:
           at: ~/
       - run:
@@ -182,6 +187,7 @@ jobs:
       - run:
           name: Deploy Docker Image
           command: |
+            echo "Contents of inventory.txt are-"
             cat ~/inventory.txt
             cd ansible
             ansible-playbook -i ~/inventory.txt deploy-appImage.yml
@@ -203,7 +209,6 @@ workflows:
     - configure-cluster:
           requires:
             - configure-infrastructure
-            - build-upload-docker
     - deploy-docker:
           requires:
             - configure-cluster
